@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resizable 3D Pomodoro</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=dark_mode" />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: transparent; 
+            font-family: 'Inter', sans-serif;
+        }
+
+        #widget-container {
+            /* THEME VARIABLES */
+            --bg-color: rgba(26, 26, 26, 0.95);
+            --text-color: #ffffff;
+            --btn-bg: #ffffff;
+            --btn-text: #000000;
+            --bar-color: rgba(255, 255, 255, 0.2);
+            --outer-shadow: rgba(0, 0, 0, 0.3);
+            --inner-light: rgba(255, 255, 255, 0.08);
+            --icon-fill: 0;
+
+            background-color: var(--bg-color);
+            
+            /* RESIZABLE PROPERTIES */
+            width: 350px;
+            height: 220px;
+            min-width: 280px;
+            min-height: 180px;
+            resize: both;
+            overflow: hidden;
+            
+            /* REDUCED BORDER RADIUS: Matches the corner indicator better */
+            border-radius: 18px; 
+            
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            backdrop-filter: blur(10px);
+            
+            box-shadow: 
+                0 0 40px 0 var(--outer-shadow),
+                inset 0 0 0 1px var(--inner-light);
+            
+            transition: background-color 0.5s ease, color 0.5s ease, box-shadow 0.5s ease;
+        }
+
+        #widget-container.light-mode {
+            --bg-color: rgba(255, 255, 255, 0.9);
+            --text-color: #1a1a1a;
+            --btn-bg: #1a1a1a;
+            --btn-text: #ffffff;
+            --bar-color: rgba(0, 0, 0, 0.2);
+            --outer-shadow: rgba(0, 0, 0, 0.08);
+            --inner-light: rgba(255, 255, 255, 1);
+            --icon-fill: 1;
+        }
+
+        #widget-container:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0;
+            resize: none;
+        }
+
+        /* Top Controls */
+        .icon-btn {
+            position: absolute;
+            top: 20px;
+            cursor: pointer;
+            opacity: 0.5;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            transition: 0.2s;
+            z-index: 10;
+        }
+        .icon-btn:hover { opacity: 1; transform: scale(1.1); }
+        #theme-toggle { left: 22px; }
+        #fs-toggle { right: 22px; }
+
+        #timer {
+            font-size: clamp(2.5rem, 15vw, 4.5rem);
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 12px;
+            letter-spacing: -2px;
+            font-variant-numeric: tabular-nums;
+            text-align: center;
+            width: 90%;
+        }
+
+        .controls { 
+            display: flex; 
+            gap: 15px; 
+            flex-wrap: wrap; 
+            justify-content: center;
+        }
+
+        .pill-btn {
+            background-color: var(--btn-bg);
+            border: none;
+            color: var(--btn-text);
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .pill-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+        }
+
+        .pill-btn:disabled {
+            background-color: var(--bar-color);
+            color: #888;
+            box-shadow: none;
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        /* Rounded Corner Indicator */
+        #widget-container::after {
+            content: '';
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            width: 15px;
+            height: 15px;
+            border-bottom: 3px solid var(--bar-color);
+            border-right: 3px solid var(--bar-color);
+            border-bottom-right-radius: 8px;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        #widget-container::-webkit-resizer {
+            display: none;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' var(--icon-fill), 'wght' 300;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="widget-container">
+        <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()">
+            <span class="material-symbols-outlined">dark_mode</span>
+        </button>
+
+        <button id="fs-toggle" class="icon-btn" onclick="toggleFullScreen()">
+            <svg style="fill:var(--text-color); width:18px;" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        </button>
+
+        <div id="timer">05:00</div>
+        
+        <div class="controls">
+            <button id="startBtn" class="pill-btn" onclick="startTimer()">Start</button>
+            <button id="pauseBtn" class="pill-btn" onclick="pauseTimer()" disabled>Pause</button>
+        </div>
+    </div>
+
+    <script>
+        let timeLeft = 5 * 60;
+        let timerId = null;
+        let isComplete = false;
+
+        function updateDisplay() {
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            document.getElementById('timer').textContent = 
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            if (isComplete) return;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = false;
+            timerId = setInterval(() => {
+                timeLeft--;
+                updateDisplay();
+                if (timeLeft <= 0) {
+                    clearInterval(timerId);
+                    completeSession();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            clearInterval(timerId);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+        }
+
+        function completeSession() {
+            isComplete = true;
+            const t = document.getElementById('timer');
+            t.textContent = "Action Done";
+            t.style.fontSize = "clamp(1.5rem, 10vw, 2.5rem)";
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = true;
+            
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#ffffff', '#888888', '#000000']
+            });
+        }
+
+        function toggleTheme() {
+            document.getElementById('widget-container').classList.toggle('light-mode');
+        }
+
+        function toggleFullScreen() {
+            const container = document.getElementById('widget-container');
+            if (!document.fullscreenElement) container.requestFullscreen();
+            else document.exitFullscreen();
+        }
+    </script>
+</body>
+</html>
